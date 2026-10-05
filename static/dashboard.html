@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Big Data Pipeline — Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">⚡</div>
+    <div>
+      <h2 data-i18n="brand_title">خط بيانات التجارة الإلكترونية</h2>
+      <p data-i18n="brand_sub">جامعة الرازي - البيانات الضخمة</p>
+    </div>
+  </div>
+
+  <div class="sb-section" data-i18n="section_overview">نظرة عامة</div>
+  <div class="sb-item active" onclick="nav('overview',this)">
+    <span class="icon">🏠</span> <span data-i18n="nav_dashboard">لوحة التحكم</span>
+  </div>
+
+  <div class="sb-section" data-i18n="section_midterm">المشروع النصفي</div>
+  <div class="sb-item" onclick="nav('ingest',this)">
+    <span class="icon">📥</span> <span data-i18n="nav_ingest">إدخال ومعالجة البيانات</span>
+    <span class="sb-badge badge-amber">REQ 1</span>
+  </div>
+
+  <div class="sb-section" data-i18n="section_final">المشروع النهائي</div>
+  <div class="sb-item" onclick="nav('indexes',this)">
+    <span class="icon">🔬</span> <span data-i18n="nav_indexes">الفهارس والاستعلامات</span>
+    <span class="sb-badge badge-amber">REQ 2</span>
+  </div>
+  <div class="sb-item" onclick="nav('aggregations',this)">
+    <span class="icon">📊</span> <span data-i18n="nav_aggregations">تقارير التجميعات</span>
+    <span class="sb-badge badge-amber">REQ 3</span>
+  </div>
+  <div class="sb-item" onclick="nav('matviews',this)">
+    <span class="icon">⚡</span> <span data-i18n="nav_matviews">العروض المادية</span>
+    <span class="sb-badge badge-amber">REQ 4</span>
+  </div>
+  <div class="sb-item" onclick="nav('jobs',this)">
+    <span class="icon">⏱️</span> <span data-i18n="nav_jobs">المهام المجدولة</span>
+    <span class="sb-badge badge-amber">REQ 5</span>
+  </div>
+
+  <div class="sb-section" data-i18n="section_system">النظام</div>
+  <div class="sb-item" onclick="window.open('/docs','_blank')">
+    <span class="icon">📚</span> <span data-i18n="nav_swagger">توثيق Swagger API</span>
+  </div>
+
+  <div class="sb-health">
+    <div class="sb-health-row">
+      <div class="dot dot-green" id="sb-dot-api"></div>
+      <span style="font-size:12px; color:var(--muted)" data-i18n="api_label">واجهة API: </span>
+      <span style="font-size:12px;" id="sb-api-status" data-i18n="checking">جارٍ الفحص…</span>
+    </div>
+    <div class="sb-health-row">
+      <div class="dot dot-green" id="sb-dot-db"></div>
+      <span style="font-size:12px; color:var(--muted)" data-i18n="db_label">قاعدة MongoDB: </span>
+      <span style="font-size:12px;" id="sb-db-status" data-i18n="checking">جارٍ الفحص…</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════
+     MAIN CONTAINER
+═══════════════════════════════════════════════════════════ -->
+<div id="main">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div>
+      <div class="topbar-title" id="page-title">لوحة التحكم <span>نظرة عامة</span></div>
+    </div>
+    <div class="topbar-actions">
+      <!-- Language Switcher -->
+      <button class="lang-toggle" id="lang-toggle-btn" onclick="toggleLanguage()">🌐 English</button>
+      <button class="btn btn-secondary" onclick="checkHealth()" data-i18n="refresh_health">🔄 تحديث الحالة</button>
+      <a class="btn btn-primary" href="/docs" target="_blank" data-i18n="swagger_ui">📚 توثيق Swagger</a>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: OVERVIEW ══ -->
+  <div class="page active" id="page-overview">
+
+    <div class="grid-4">
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--cyan)"></div>
+        <div class="kpi-icon">📦</div>
+        <div class="kpi-label" data-i18n="kpi_records">السجلات المعتمدة</div>
+        <div class="kpi-val" id="kpi-records">—</div>
+        <div class="kpi-sub" data-i18n="kpi_records_sub">في مجموعة orders_validated</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--green)"></div>
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-label" data-i18n="kpi_revenue">إجمالي المبيعات</div>
+        <div class="kpi-val" id="kpi-revenue">—</div>
+        <div class="kpi-sub" data-i18n="kpi_revenue_sub">ريال يمني (إجمالي الإيرادات)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--purple)"></div>
+        <div class="kpi-icon">📅</div>
+        <div class="kpi-label" data-i18n="kpi_days">اللقطات اليومية</div>
+        <div class="kpi-val" id="kpi-days">—</div>
+        <div class="kpi-sub" data-i18n="kpi_days_sub">ملخص المبيعات اليومية MV</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--amber)"></div>
+        <div class="kpi-icon">🏆</div>
+        <div class="kpi-label" data-i18n="kpi_products">أفضل المنتجات</div>
+        <div class="kpi-val" id="kpi-products">—</div>
+        <div class="kpi-sub" data-i18n="kpi_products_sub">ملخص أداء المنتجات MV</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Quick Actions -->
+      <div class="card">
+        <div class="card-header">
+          <div><h2 data-i18n="quick_actions">🚀 إجراءات سريعة فورية</h2><div class="card-subtitle" data-i18n="quick_actions_sub">تشغيل أي مرحلة من خط الأنابيب بضغطة واحدة</div></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn btn-secondary" style="justify-content:flex-start" onclick="nav('ingest',document.querySelectorAll('.sb-item')[1])" data-i18n="action_ingest">
+            📥 &nbsp;تشغيل خط الإدخال والـ ELT (عينة صغيرة)
+          </button>
+          <button class="btn btn-secondary" style="justify-content:flex-start" onclick="nav('indexes',document.querySelectorAll('.sb-item')[2])" data-i18n="action_indexes">
+            🔬 &nbsp;إنشاء الفهارس + تشغيل قياس Explain
+          </button>
+          <button class="btn btn-secondary" style="justify-content:flex-start" onclick="nav('aggregations',document.querySelectorAll('.sb-item')[3])" data-i18n="action_aggregations">
+            📊 &nbsp;استعراض تقارير التجميعات الـ 5
+          </button>
+          <button class="btn btn-secondary" style="justify-content:flex-start" onclick="nav('matviews',document.querySelectorAll('.sb-item')[4])" data-i18n="action_matviews">
+            ⚡ &nbsp;تحديث العروض المادية تزايدياً
+          </button>
+          <button class="btn btn-secondary" style="justify-content:flex-start" onclick="nav('jobs',document.querySelectorAll('.sb-item')[5])" data-i18n="action_jobs">
+            ⏱️ &nbsp;استعراض وتشغيل المهام المجدولة
+          </button>
+        </div>
+      </div>
+
+      <!-- System Health -->
+      <div class="card">
+        <div class="card-header">
+          <div><h2 data-i18n="system_health">❤️ صحة وجاهزية النظام</h2><div class="card-subtitle" data-i18n="system_health_sub">فحص الاتصال المباشر عبر GET /health</div></div>
+          <button class="btn btn-secondary" onclick="checkHealth()" data-i18n="refresh">تحديث</button>
+        </div>
+        <div class="terminal" id="health-terminal">// اضغط تحديث لفحص الاتصال وحالة النظام…</div>
+      </div>
+    </div>
+
+    <!-- Requirements checklist -->
+    <div class="section-title" data-i18n="req_title">قائمة متطلبات المشروع المكتملة</div>
+    <div class="grid-3">
+      <div class="card" style="padding:18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:20px">📥</span>
+          <div><div style="font-size:13px;font-weight:700" data-i18n="req1_title">المطلب 1 · النصفي</div><div style="font-size:11px;color:var(--muted)" data-i18n="req1_sub">خط الإدخال والـ ELT</div></div>
+          <span class="tag tag-amber" style="margin-left:auto">POST /ingest</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="req1_desc">موجه الملفات → المحرك بالدفعات/Spark → جودة البيانات والعزل → التخزين المعتمد</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:20px">🔬</span>
+          <div><div style="font-size:13px;font-weight:700" data-i18n="req2_title">المطلب 2 · النهائي</div><div style="font-size:11px;color:var(--muted)" data-i18n="req2_sub">الفهارس ومقارنة Explain</div></div>
+          <span class="tag tag-cyan" style="margin-left:auto">POST /indexes</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="req2_desc">فهارس مفردة ومركبة + تحول المسار من COLLSCAN إلى IXSCAN وخفض الوثائق >99%</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:20px">📊</span>
+          <div><div style="font-size:13px;font-weight:700" data-i18n="req3_title">المطلب 3 · النهائي</div><div style="font-size:11px;color:var(--muted)" data-i18n="req3_sub">تقارير التجميعات</div></div>
+          <span class="tag tag-purple" style="margin-left:auto">GET /aggregations</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="req3_desc">5 خطوط تجميع: المبيعات بالمدينة، المنتجات، كبار العملاء، الفترات، الحالات</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:20px">⚡</span>
+          <div><div style="font-size:13px;font-weight:700" data-i18n="req4_title">المطلب 4 · النهائي</div><div style="font-size:11px;color:var(--muted)" data-i18n="req4_sub">العروض المادية</div></div>
+          <span class="tag tag-green" style="margin-left:auto">POST /refresh-mv</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="req4_desc">تحديث تزايدي ذكي عبر $merge لمجموعتي daily_sales و top_products</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:20px">⏱️</span>
+          <div><div style="font-size:13px;font-weight:700" data-i18n="req5_title">المطلب 5 · النهائي</div><div style="font-size:11px;color:var(--muted)" data-i18n="req5_sub">المهام المجدولة والتدقيق</div></div>
+          <span class="tag tag-blue" style="margin-left:auto">GET /jobs</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="req5_desc">مجدول خلفي تلقائي + سجلات تدقيق بالملي ثانية + دعم التشغيل اليدوي</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:20px">🌐</span>
+          <div><div style="font-size:13px;font-weight:700" data-i18n="req6_title">المطلب 6 · النهائي</div><div style="font-size:11px;color:var(--muted)" data-i18n="req6_sub">واجهة API الموحدة</div></div>
+          <span class="tag tag-green" style="margin-left:auto">GET /health</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="req6_desc">10 مسارات RESTful موثقة + Swagger UI + جاهزية التقييم الآلي</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: INGEST ══ -->
+  <div class="page" id="page-ingest">
+    <div class="section-title" data-i18n="ing_config">⚙️ إعدادات خط أنابيب البيانات</div>
+    <div class="card" style="margin-bottom:22px">
+      <div class="card-header">
+        <div><h2 data-i18n="ing_title">📥 خط إدخال ومعالجة البيانات (ELT)</h2><div class="card-subtitle" data-i18n="ing_subtitle">المشروع النصفي · POST /ingest · File Router → ELT → MongoDB</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label data-i18n="dataset_mode">حجم مجموعة البيانات</label>
+          <select id="ingest-mode">
+            <option value="small" data-i18n="opt_small">عينة صغيرة للاختبار السريع (20 ألف سجل)</option>
+            <option value="huge" data-i18n="opt_huge">ملف عملاق للإنتاج الفعلي (~912 ألف سجل)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="btn-ingest" onclick="runIngest()" data-i18n="btn_run_ingest">
+          ▶ تشغيل خط الإدخال والـ ELT
+        </button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px" data-i18n="ing_desc">
+        يقوم الخط بـ: فحص الحجم → اختيار المحرك (بايثون/Spark) → تحميل الخام → تطبيق 12 قاعدة عزل و10 تصحيح → الحفظ في orders_validated
+      </p>
+      <div class="section-title" style="margin-top:4px" data-i18n="pipeline_output">سجل مخرجات المعالجة</div>
+      <div class="terminal" id="ingest-terminal">// اضغط "تشغيل خط الإدخال والـ ELT" للبدء…
+// تستغرق المعالجة بضع ثوانٍ بحسب حجم الملف.</div>
+    </div>
+
+    <div class="grid-3">
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--cyan)"></div>
+        <div class="kpi-label" data-i18n="kpi_raw">البيانات المقروءة</div>
+        <div class="kpi-val mono" id="ing-raw">—</div>
+        <div class="kpi-sub" data-i18n="kpi_raw_sub">سجل من ملف CSV</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--green)"></div>
+        <div class="kpi-label" data-i18n="kpi_valid">السجلات المعتمدة</div>
+        <div class="kpi-val mono" id="ing-validated">—</div>
+        <div class="kpi-sub" data-i18n="kpi_valid_sub">اجتازت قواعد الجودة (Validated)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--red)"></div>
+        <div class="kpi-label" data-i18n="kpi_quar">السجلات المعزولة</div>
+        <div class="kpi-val mono" id="ing-quarantined">—</div>
+        <div class="kpi-sub" data-i18n="kpi_quar_sub">معزولة بسبب أخطاء (Quarantine)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: INDEXES ══ -->
+  <div class="page" id="page-indexes">
+
+    <div class="grid-2" style="margin-bottom:22px">
+      <!-- Create Indexes -->
+      <div class="card">
+        <div class="card-header">
+          <div><h2 data-i18n="idx_card_title">🗂️ إنشاء وتفعيل الفهارس</h2><div class="card-subtitle" data-i18n="idx_card_sub">المشروع النهائي · POST /indexes</div></div>
+          <button class="btn btn-green" id="btn-create-idx" onclick="createIndexes()" data-i18n="btn_create_all">▶ إنشاء وتفعيل الكل</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px" data-i18n="idx_desc">
+          إنشاء كافة الفهارس المطلوبة على orders_validated متضمنة الفهرس المركب idx_city_date.
+        </p>
+        <div class="terminal" id="idx-terminal">// اضغط "إنشاء وتفعيل الكل" لبناء الفهارس في قاعدة البيانات…</div>
+      </div>
+
+      <!-- Explain Benchmark -->
+      <div class="card">
+        <div class="card-header">
+          <div><h2 data-i18n="explain_title">🔬 قياس أداء الاستعلامات (Explain Benchmark)</h2><div class="card-subtitle" data-i18n="explain_sub">مقارنة حية للتحول من COLLSCAN إلى IXSCAN</div></div>
+          <button class="btn btn-secondary" id="btn-explain" onclick="runExplain()" data-i18n="btn_run_explain">▶ تشغيل اختبار Explain</button>
+        </div>
+        <div class="cmp-grid" id="explain-cmp">
+          <div class="cmp-box before">
+            <span class="cmp-label" data-i18n="before_label">قبل الفهرسة (مسح شامل COLLSCAN)</span>
+            <div class="cmp-row"><span data-i18n="stage">مرحلة الفحص:</span> <strong id="e-b-stage">—</strong></div>
+            <div class="cmp-row"><span data-i18n="docs_examined">الوثائق المفحوصة:</span> <strong id="e-b-docs">—</strong></div>
+            <div class="cmp-row"><span data-i18n="time">زمن التنفيذ:</span> <strong id="e-b-time">—</strong></div>
+          </div>
+          <div class="cmp-box after">
+            <span class="cmp-label" data-i18n="after_label">بعد الفهرسة (عبر الفهرس IXSCAN)</span>
+            <div class="cmp-row"><span data-i18n="stage">مرحلة الفحص:</span> <strong id="e-a-stage">—</strong></div>
+            <div class="cmp-row"><span data-i18n="docs_examined">الوثائق المفحوصة:</span> <strong id="e-a-docs">—</strong></div>
+            <div class="cmp-row"><span data-i18n="time">زمن التنفيذ:</span> <strong id="e-a-time">—</strong></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;color:var(--muted)" data-i18n="efficiency_gain">نسبة التحسن في الكفاءة:</span>
+          <div class="gain-pill" id="gain-pill" data-i18n="click_explain">اضغط "تشغيل اختبار Explain"</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Practical Queries -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 data-i18n="queries_title">🔍 الاستعلامات العملية الخمسة</h2>
+          <div class="card-subtitle" data-i18n="queries_sub">GET /queries/{name} — تنفيذ استعلامات الأعمال مع الفلترة الديناميكية والفهارس</div>
+        </div>
+      </div>
+
+      <!-- Quick Preset Chips -->
+      <div class="query-chips">
+        <span class="query-chips-label" data-i18n="quick_queries_label">تشغيل سريع:</span>
+        <button class="query-chip active" id="chip-city_date_range" onclick="selectQuickQuery('city_date_range')">📅 المدينة + التاريخ</button>
+        <button class="query-chip" id="chip-customer_orders" onclick="selectQuickQuery('customer_orders')">👤 طلبات عميل</button>
+        <button class="query-chip" id="chip-city_orders" onclick="selectQuickQuery('city_orders')">🏙️ طلبات مدينة</button>
+        <button class="query-chip" id="chip-status_high_value" onclick="selectQuickQuery('status_high_value')">💎 مبالغ عالية</button>
+        <button class="query-chip" id="chip-payment_method_orders" onclick="selectQuickQuery('payment_method_orders')">💳 وسيلة الدفع</button>
+      </div>
+
+      <!-- Main Controls Row -->
+      <div class="field-row" id="query-controls-row">
+        <div class="field" style="flex: 2 1 240px">
+          <label data-i18n="query_name">اسم الاستعلام</label>
+          <select id="query-name" onchange="onQuerySelectChange()">
+            <option value="city_date_range">city_date_range (المدينة + نطاق زمني)</option>
+            <option value="customer_orders">customer_orders (طلبات عميل محدد)</option>
+            <option value="city_orders">city_orders (طلبات مدينة محددة)</option>
+            <option value="status_high_value">status_high_value (الطلبات ذات القيمة العالية)</option>
+            <option value="payment_method_orders">payment_method_orders (حسب طريقة الدفع)</option>
+          </select>
+        </div>
+
+        <!-- City Dropdown (for city_date_range and city_orders) -->
+        <div class="field" id="wrap-city">
+          <label data-i18n="city_label">المدينة</label>
+          <select id="q-city">
+            <option value="صنعاء">صنعاء (Sana'a)</option>
+            <option value="عدن">عدن (Aden)</option>
+            <option value="تعز">تعز (Taiz)</option>
+            <option value="إب">إب (Ibb)</option>
+            <option value="المكلا">المكلا (Mukalla)</option>
+            <option value="ذمار">ذمار (Dhamar)</option>
+            <option value="الحديدة">الحديدة (Hodeidah)</option>
+            <option value="all" data-i18n="opt_all_cities">جميع المدن (All Cities)</option>
+          </select>
+        </div>
+
+        <!-- Customer ID (for customer_orders) -->
+        <div class="field" id="wrap-customer" style="display:none">
+          <label data-i18n="customer_id_label">معرف العميل</label>
+          <input type="text" id="q-customer" value="عميل-8000001" placeholder="مثال: عميل-8000001">
+        </div>
+
+        <!-- Order Status (for status_high_value) -->
+        <div class="field" id="wrap-status" style="display:none">
+          <label data-i18n="status_label">حالة الطلب</label>
+          <select id="q-status">
+            <option value="تم التسليم">تم التسليم (Delivered)</option>
+            <option value="مؤكد">مؤكد (Confirmed)</option>
+            <option value="قيد الشحن">قيد الشحن (In Transit)</option>
+            <option value="قيد الانتظار">قيد الانتظار (Pending)</option>
+            <option value="مرتجع">مرتجع (Returned)</option>
+            <option value="ملغي">ملغي (Cancelled)</option>
+            <option value="all" data-i18n="opt_all_statuses">كافة الحالات (All)</option>
+          </select>
+        </div>
+
+        <!-- Min Amount (for status_high_value) -->
+        <div class="field" id="wrap-amount" style="display:none">
+          <label data-i18n="min_amount_label">الحد الأدنى للمبلغ (ريال)</label>
+          <input type="number" id="q-min-amount" value="50000" step="5000" min="0">
+        </div>
+
+        <!-- Payment Method (for payment_method_orders) -->
+        <div class="field" id="wrap-payment" style="display:none">
+          <label data-i18n="payment_method_label">وسيلة الدفع</label>
+          <select id="q-payment">
+            <option value="نقدًا عند التسليم">نقدًا عند التسليم (Cash on Delivery)</option>
+            <option value="بطاقة">بطاقة (Card)</option>
+            <option value="محفظة إلكترونية">محفظة إلكترونية (E-Wallet)</option>
+          </select>
+        </div>
+
+        <!-- Date Range (for city_date_range) -->
+        <div class="field" id="wrap-start">
+          <label data-i18n="start_date">تاريخ البدء</label>
+          <input type="text" id="q-start" value="2026-01-01" placeholder="2026-01-01">
+        </div>
+        <div class="field" id="wrap-end">
+          <label data-i18n="end_date">تاريخ النهاية</label>
+          <input type="text" id="q-end" value="2026-06-30" placeholder="2026-06-30">
+        </div>
+
+        <!-- Limit -->
+        <div class="field" style="max-width:100px;min-width:80px">
+          <label data-i18n="limit">حد السجلات</label>
+          <input type="number" id="q-limit" value="20" min="1" max="500">
+        </div>
+
+        <button class="btn btn-primary" id="btn-query" onclick="runQuery()" data-i18n="btn_run_query" style="height:38px">
+          ▶ تنفيذ الاستعلام
+        </button>
+      </div>
+
+      <!-- Result Meta Bar -->
+      <div class="query-meta-bar" id="query-meta-bar" style="display:none">
+        <div class="query-badges">
+          <span class="tag tag-green" id="q-meta-count">0 سجل</span>
+          <span class="tag tag-blue" id="q-meta-time">0.00s</span>
+          <span class="tag tag-purple" id="q-meta-index">Index: —</span>
+        </div>
+        <div class="query-filter-display" id="q-meta-filter" title="MongoDB Filter">{}</div>
+      </div>
+
+      <!-- Results Table -->
+      <div class="tbl-wrap" style="margin-top:14px">
+        <table id="query-table">
+          <thead id="query-thead">
+            <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px" data-i18n="query_init">قم باختيار استعلام ثم اضغط "تنفيذ الاستعلام" لعرض النتائج</td></tr>
+          </thead>
+          <tbody id="query-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: AGGREGATIONS ══ -->
+  <div class="page" id="page-aggregations">
+    <div class="tabs" id="agg-tabs">
+      <button class="tab active" onclick="loadAgg('sales_by_city',this)" data-i18n="agg_tab_city">🏙️ المبيعات حسب المدينة</button>
+      <button class="tab" onclick="loadAgg('top_products',this)" data-i18n="agg_tab_products">📦 أفضل المنتجات مبيعاً</button>
+      <button class="tab" onclick="loadAgg('top_customers',this)" data-i18n="agg_tab_customers">👑 أكثر العملاء إنفاقاً</button>
+      <button class="tab" onclick="loadAgg('sales_by_period',this)" data-i18n="agg_tab_period">📅 المبيعات عبر الفترات</button>
+      <button class="tab" onclick="loadAgg('orders_by_status',this)" data-i18n="agg_tab_status">📋 الطلبات حسب الحالة</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 id="agg-title">🏙️ إجمالي المبيعات حسب المدينة</h2>
+          <div class="card-subtitle" id="agg-sub">المشروع النهائي · GET /aggregations/sales_by_city</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="field" style="margin:0">
+            <input type="number" id="agg-limit" value="10" min="1" max="200" style="min-width:70px;padding:7px 10px">
+          </div>
+          <button class="btn btn-primary" id="btn-agg" onclick="reloadAgg()" data-i18n="btn_load_report">▶ تشغيل التقرير</button>
+        </div>
+      </div>
+
+      <div id="agg-stats" style="display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap"></div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead id="agg-thead">
+            <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px" data-i18n="agg_init">اختر نوع التقرير ثم اضغط "تشغيل التقرير"</td></tr>
+          </thead>
+          <tbody id="agg-tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="agg-meta"></div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: MATERIALIZED VIEWS ══ -->
+  <div class="page" id="page-matviews">
+    <div class="grid-2" style="margin-bottom:22px">
+
+      <div class="card">
+        <div class="card-header">
+          <div><h2 data-i18n="mv_card_title">⚡ تحديث العروض المادية</h2><div class="card-subtitle" data-i18n="mv_card_sub">المشروع النهائي · POST /refresh-mv</div></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-green" id="btn-mv-inc" onclick="refreshMV('incremental')" data-i18n="btn_mv_inc">⚡ تحديث تزايدي (Incremental)</button>
+            <button class="btn btn-amber" id="btn-mv-full" onclick="refreshMV('full')" data-i18n="btn_mv_full">🔄 إعادة بناء شاملة (Full Rebuild)</button>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px" data-i18n="mv_desc">
+          التحديث التزايدي: يعالج البيانات الجديدة فقط منذ آخر نقطة توقف. التحديث الشامل: يعيد احتساب العرض كاملاً من الصفر.
+        </p>
+        <div class="terminal" id="mv-terminal">// اضغط على زر التحديث لتشغيل المعالجة التزايدية عبر POST /refresh-mv…</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><h2 data-i18n="mv_status_title">📊 حالة العروض المادية</h2><div class="card-subtitle" data-i18n="mv_status_sub">المجموعات المجمعة المخزنة في MongoDB</div></div>
+          <button class="btn btn-secondary" onclick="loadMVData()" data-i18n="btn_reload">تحديث الحالة</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th data-i18n="th_view">اسم العرض المادي</th><th data-i18n="th_records">عدد السجلات</th><th data-i18n="th_mode">النمط</th><th data-i18n="th_status">الحالة</th></tr></thead>
+            <tbody id="mv-status-body">
+              <tr><td colspan="4" style="color:var(--muted);text-align:center">اضغط تحديث الحالة لعرض التفاصيل</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Sales MV Data -->
+    <div class="card" style="margin-bottom:22px">
+      <div class="card-header">
+        <div><h2 data-i18n="daily_sales_title">📅 ملخص المبيعات اليومية</h2><div class="card-subtitle" data-i18n="daily_sales_sub">GET /materialized/daily-sales · بيانات مجمعة مسبقاً لكل يوم</div></div>
+        <button class="btn btn-secondary" onclick="loadDailySales()" data-i18n="btn_load_data">جلب البيانات</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th data-i18n="th_date">التاريخ</th><th data-i18n="th_orders_count">عدد الطلبات</th><th data-i18n="th_total_sales">إجمالي المبيعات (ريال)</th><th data-i18n="th_avg_order">متوسط قيمة الطلب</th></tr></thead>
+          <tbody id="daily-sales-body"><tr><td colspan="4" style="color:var(--muted);text-align:center">اضغط "جلب البيانات"</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Top Products MV Data -->
+    <div class="card">
+      <div class="card-header">
+        <div><h2 data-i18n="top_prod_title">🏆 ملخص أفضل المنتجات</h2><div class="card-subtitle" data-i18n="top_prod_sub">GET /materialized/top-products · تصنيف المنتجات الأكثر إيراداً</div></div>
+        <button class="btn btn-secondary" onclick="loadTopProducts()" data-i18n="btn_load_data">جلب البيانات</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th data-i18n="th_product">المنتج</th><th data-i18n="th_units_sold">الوحدات المباعة</th><th data-i18n="th_total_revenue">إجمالي الإيرادات</th><th data-i18n="th_avg_price">متوسط السعر</th></tr></thead>
+          <tbody id="top-products-body"><tr><td colspan="4" style="color:var(--muted);text-align:center">اضغط "جلب البيانات"</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: JOBS ══ -->
+  <div class="page" id="page-jobs">
+    <div class="section-title" data-i18n="jobs_title">⏱️ المهام المجدولة — المطلب الخامس</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:28px" id="jobs-cards">
+      <div class="job-card">
+        <div>
+          <div class="job-info">
+            <h3 data-i18n="job1_title">🔄 تحديث العروض المادية (refresh_materialized_views)</h3>
+            <p data-i18n="job1_desc">تحديث تزايدي دوري للعروض المادية عبر خط أنابيب $merge كل 10 دقائق</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="tag tag-green" data-i18n="tag_registered">مسجلة ونشطة</span>
+          <button class="btn btn-primary" onclick="triggerJob('refresh_materialized_views')" data-i18n="btn_run_now">▶ تشغيل فوري</button>
+        </div>
+      </div>
+      <div class="job-card">
+        <div>
+          <div class="job-info">
+            <h3 data-i18n="job2_title">📊 إنشاء التقرير الدوري (generate_periodic_report)</h3>
+            <p data-i18n="job2_desc">توليد ملخص إحصائي شامل وحفظ اللقطة في مجموعة periodic_reports للمتابعة التاريخية</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="tag tag-green" data-i18n="tag_registered">مسجلة ونشطة</span>
+          <button class="btn btn-primary" onclick="triggerJob('generate_periodic_report')" data-i18n="btn_run_now">▶ تشغيل فوري</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title"><span data-i18n="audit_title">📋 سجلات تدقيق تنفيذ المهام</span> <span style="font-size:11px;color:var(--muted);font-weight:400" data-i18n="audit_subtitle">— موثقة بالكامل في مجموعة job_execution_logs</span></div>
+    <div class="card">
+      <div class="card-header">
+        <div><h2 data-i18n="audit_history_title">سجل العمليات السابقة</h2><div class="card-subtitle" data-i18n="audit_history_sub">GET /jobs — استعراض أحدث عمليات التنفيذ وحالات النجاح والمدة</div></div>
+        <button class="btn btn-secondary" onclick="loadJobs()" data-i18n="btn_refresh_logs">🔄 تحديث السجلات</button>
+      </div>
+      <div class="terminal" id="job-terminal">// اضغط "تشغيل فوري" لأي مهمة أو "تحديث السجلات" لعرض التوثيق…</div>
+      <div class="tbl-wrap" style="margin-top:16px">
+        <table>
+          <thead><tr><th data-i18n="th_job_name">اسم المهمة</th><th data-i18n="th_triggered_by">طريقة التشغيل</th><th data-i18n="th_started">وقت البدء</th><th data-i18n="th_duration">المدة</th><th data-i18n="th_status">الحالة</th></tr></thead>
+          <tbody id="jobs-tbody"><tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">اضغط "تحديث السجلات"</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- TOAST -->
+<div id="toast">
+  <span id="toast-icon">✅</span>
+  <span id="toast-msg">تمت العملية</span>
+</div>
+
+<!-- SCRIPTS -->
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>
