@@ -602,4 +602,4 @@ hamza_db
 5. **الخطوة 5 (خاتمة العرض وتوثيق Swagger):** استعرض توثيق Swagger التفاعلي عبر `/docs` واختم العرض بتقرير النجاح الكامل لسكربت `verify_all.py` بنسبة **100% (Grade: 7.0 / 7.0)**.
 
 ---
-Developed with engineering excellence by **حمزة يفوز (Hamza Yafouz)**.
+Developed with engineering excellence by **حمزة يفوز (Hamza Yafooz)**.
