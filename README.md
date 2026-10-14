@@ -16,7 +16,7 @@
    - 3.1 [التشغيل التلقائي الفوري بنقرة واحدة (`run_api.bat`)](#ar-3-1)
    - 3.2 [لوحة التحكم الزجاجية التنفيذية (`Glassmorphism Web Dashboard`)](#ar-3-2)
    - 3.3 [الفحص والتقييم الآلي الشامل بضغطة زر (`verify_all.py` - Grade 7.0 / 7.0)](#ar-3-3)
-   - 3.4 [التشغيل عبر القائمة التفاعلية الشاملة (`main.py`)](#ar-3-4)
+   - 3.4 [التشغيل المباشر غير التفاعلي ومعالجة ملف محدد (`main.py & run_ingest`)](#ar-3-4)
    - 3.5 [تشغيل خادم الـ API عبر سطر الأوامر (`src.api`)](#ar-3-5)
    - 3.6 [التشغيل المباشر للوحدات البرمجية المنفصلة (Modular Execution)](#ar-3-6)
    - 3.7 [طاقم الاختبارات الآلية الشامل (Automated Test Suite)](#ar-3-7)
@@ -106,8 +106,9 @@ Hamza/
 > ⚡ **دليل البدء السريع والتشغيل الفوري (30 Seconds Onboarding):**
 > 1. **تأكد من تشغيل MongoDB:** افتح PowerShell واكتب `net start MongoDB`
 > 2. **ثبت المكتبات بضغطة زر:** `pip install -r requirements.txt`
-> 3. **شغّل الواجهة الرسومية مباشرة:** اضغط مرتين على ملف [`run_api.bat`](file:///c:/Users/USER/OneDrive%20-%20balal/Desktop/Hamza/run_api.bat)
-> 4. **استعرض اللوحة التنفيذية:** سيفتح المتصفح تلقائياً على الرابط: **http://127.0.0.1:8000/dashboard**
+> 3. **تشغيل معالجة ملف محدد مباشرة (غير تفاعلي):** `python main.py data/01_student_test_small.csv`
+> 4. **شغّل الواجهة الرسومية مباشرة:** اضغط مرتين على ملف `run_api.bat`
+> 5. **استعرض اللوحة التنفيذية:** سيفتح المتصفح تلقائياً على الرابط: **http://127.0.0.1:8000/dashboard**
 
 ### 2.1 المتطلبات البرمجية الأساسية:
 1. **نظام التشغيل:** Windows 10 أو Windows 11 (64-bit).
@@ -154,18 +155,6 @@ copy .env.example .env
   3. يفتح متصفح الإنترنت الافتراضي لديك فوراً على **لوحة التحكم الزجاجية الفاخرة**:
      🌐 **http://127.0.0.1:8000/dashboard**
   4. يعرض روابط توثيق Swagger وفحص الصحة مباشرة في شاشة الأوامر.
-
-### ⚡ تشغيل التقييم الآلي المباشر (Non-Interactive Ingest)
-لتشغيل معالجة ملف محدد غير تفاعلياً بدون انتظار إدخال يدوي:
-```bash
-python main.py data/01_student_test_small.csv
-```
-أو الاستدعاء البرمجي المباشر:
-```python
-from main import run_ingest
-metrics = run_ingest("data/01_student_test_small.csv")
-```
-
 
 ---
 
@@ -218,28 +207,51 @@ python verify_all.py
 ---
 
 <a id="ar-3-4"></a>
-### 3.4 التشغيل عبر القائمة التفاعلية الشاملة (`main.py`)
+### 3.4 التشغيل المباشر غير التفاعلي ومعالجة ملف محدد (`main.py & run_ingest`)
 👉 **الملف:** [`main.py`](file:///c:/Users/USER/OneDrive%20-%20balal/Desktop/Hamza/main.py)
 
-تتيح للمستخدم أو الأستاذ المناقش اختبار أي وظيفة في المشروع بشكل منفرد عبر واجهة سطر أوامر تفاعلية سهلة:
+تم ضبط هذا الملف ليكون **مباشراً وغير تفاعلي بالكامل 100%** ليتوافق تماماً مع سكريبتات الاختبار والتقييم الآلي المعتمدة لمقرر البيانات الضخمة، دون أي توقف أو انتظار لإدخال يدوي:
+
+#### أ. تشغيل معالجة ملف محدد عبر سطر الأوامر (CLI):
 ```bash
+# تمرير مسار الملف مباشرة كوسيط:
+python main.py data/01_student_test_small.csv
+
+# أو باستخدام المعامل --file:
+python main.py --file data/01_student_test_small.csv
+
+# أو تشغيل العينة الافتراضية فورياً بدون انتظار:
 python main.py
 ```
-**القائمة التفاعلية:**
+
+#### ب. الاستدعاء البرمجي المباشر للدالة من بايثون:
+```python
+from main import run_ingest
+
+# استدعاء دالة المعالجة المباشرة واستلام تقرير المقاييس كاملاً:
+metrics = run_ingest("data/01_student_test_small.csv")
+
+print("Validated Count   :", metrics.get("validated_count"))
+print("Quarantined Count :", metrics.get("quarantine_count"))
+print("Idempotency Check :", metrics.get("idempotency_check"))
+```
+
+**المخرجات الفورية المتوقعة:**
 ```text
-=================================================================
-🎓 Big Data Pipeline Project (Al-Razi University) - Main System
-=================================================================
- [1] Generate Small Sample & Run Ingestion Pipeline
- [2] Run Ingestion Pipeline on Huge File
- [3] Run Practical Queries, Indexes & Explain Benchmark
- [4] Run Aggregation Reports (5 Reports)
- [5] Build & Incremental Refresh Materialized Views
- [6] Execute Scheduled Jobs & View Execution Audit Logs
- [7] Start Unified FastAPI Server
- [8] Run End-to-End Automated Verification
- [0] Exit
-=================================================================
+============================================================
+🚀 Starting Big Data Pipeline (Non-Interactive Ingest)
+📁 Target File : data/01_student_test_small.csv
+============================================================
+🔑 Run ID: run_a1b2c3d4 | Engine: python_batch
+📦 Raw Loaded: 20,000 records
+============================================================
+✅ Ingestion & ELT Completed Successfully!
+   - Validated Records   : 17,000
+   - Quarantined Records : 3,000
+   - Total Duration      : 3.42s
+   - Throughput          : 5,847.95 rows/s
+   - Idempotency Check   : PASS
+============================================================
 ```
 
 ---
