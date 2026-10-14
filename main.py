@@ -1,156 +1,144 @@
+"""
+main.py
+=======
+Unified Non-Interactive & CLI Entry Point for Big Data Pipeline (Midterm & Final)
+Al-Razi University - Big Data Course
+
+Features:
+  - run_ingest(file_path): Direct non-interactive execution for automated grading scripts.
+  - CLI execution with arguments: python main.py <file_path>
+  - Zero manual input prompts (no input() blocking).
+"""
+
+import os
 import sys
-if hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
-    except Exception:
-        pass
 import time
 import uuid
-import json
+import argparse
 
 from config.settings import (
-    HUGE_FILE_PATH,
-    SMALL_SAMPLE_GENERATION_SIZE_MB,
     SMALL_SAMPLE_PATH,
-    MONGO_URI,
-    MONGO_DB_NAME
+    HUGE_FILE_PATH,
 )
-
-from src.create_small_sample import generate_sample
 from src.mongo_setup import setup_mongodb
 from src.file_router import select_processing_engine
 from src.batch_loader import load_batch
 from src.spark_loader import load_spark
 from src.elt_pipeline import run_elt
 from src.metrics import generate_metrics
-from src import aggregations
-from src import analytics_queries
-from src import materialized_views
-from src import scheduler_jobs
 
 
-def run_ingest(file_path):
+def run_ingest(file_path: str = None) -> dict:
+    """
+    Non-interactive execution of the ELT Data Ingestion pipeline.
+    Suitable for automated grading scripts, API calls, and scheduled jobs.
+    
+    Args:
+        file_path (str, optional): Path to CSV data file.
+                                   If None, uses 01_student_test_small.csv or SMALL_SAMPLE_PATH.
+                                   
+    Returns:
+        dict: Full metrics dictionary containing run_id, loaded, validated, quarantined, throughput, etc.
+    """
+    # 1. Resolve target file path
+    if not file_path:
+        candidates = [
+            os.path.join("data", "01_student_test_small.csv"),
+            SMALL_SAMPLE_PATH,
+            os.path.join("data", "orders_small_sample.csv"),
+            HUGE_FILE_PATH,
+        ]
+        for c in candidates:
+            if c and os.path.exists(c):
+                file_path = c
+                break
+        if not file_path:
+            file_path = SMALL_SAMPLE_PATH
+
+    # Normalize relative/data folder path if needed
+    if not os.path.exists(file_path):
+        alt_path = os.path.join("data", os.path.basename(file_path))
+        if os.path.exists(alt_path):
+            file_path = alt_path
+
+    print("=" * 60)
+    print("🚀 Starting Big Data Pipeline (Non-Interactive Ingest)")
+    print(f"📁 Target File : {file_path}")
+    print("=" * 60)
+
+    # 2. Setup MongoDB (creates unique index for idempotency)
     setup_mongodb()
-    run_id = f'run_{uuid.uuid4().hex[:8]}'
-    print(f'\n-> Run ID: {run_id}')
-    print('🔍 Checking file size to select the appropriate engine...')
+
+    # 3. Select processing engine (python_batch <= 400MB < pyspark)
     engine = select_processing_engine(file_path)
-
     if not engine:
-        print('❌ File not found:', file_path)
-        return
+        raise FileNotFoundError(f"File not found: {file_path}")
 
-    print('⏱️  Starting the data processing pipeline...')
-    start_time_total = time.time()
-    print('📥 Stage 1: Load stage (Raw Ingestion)...')
+    # 4. Generate unique run ID
+    run_id = f"run_{uuid.uuid4().hex[:8]}"
+    print(f"🔑 Run ID: {run_id} | Engine: {engine}")
+
+    # 5. Raw Ingestion stage
+    start_time = time.time()
     raw_loaded = 0
-    if engine == 'python_batch':
+    if engine == "python_batch":
         raw_loaded = load_batch(run_id, file_path)
-    elif engine == 'pyspark':
+    elif engine == "pyspark":
         raw_loaded = load_spark(run_id, file_path)
 
-    print(f'\n✅ Total records loaded raw: {raw_loaded:,}')
+    print(f"📦 Raw Loaded: {raw_loaded:,} records")
+
+    # 6. ELT Transformation stage (Cleaning, Quarantine, Audit Trail, Idempotency)
+    elt_counters = {}
     if raw_loaded > 0:
-        print('🛠️  Beginning cleanup, quarantine, and safe update processes (ELT)...')
-        elt_counters, elt_elapsed = run_elt(run_id)
-        print('📊 Generating and exporting reports...')
-        total_seconds = time.time() - start_time_total
-        metrics = generate_metrics(run_id, file_path, engine, raw_loaded, elt_counters, total_seconds)
-        print('\n✅ Execution completed successfully! Extracted metrics:')
-        print(json.dumps(metrics, indent=4, ensure_ascii=False))
-    else:
-        print('⚠️ No data available for processing.')
+        elt_counters, _ = run_elt(run_id)
+
+    total_seconds = time.time() - start_time
+
+    # 7. Metrics generation
+    metrics = generate_metrics(
+        run_id, file_path, engine, raw_loaded, elt_counters, total_seconds
+    )
+
+    print("=" * 60)
+    print("✅ Ingestion & ELT Completed Successfully!")
+    print(f"   - Validated Records   : {metrics.get('validated_count', 0):,}")
+    print(f"   - Quarantined Records : {metrics.get('quarantine_count', 0):,}")
+    print(f"   - Total Duration      : {metrics.get('total_seconds', total_seconds):.2f}s")
+    print(f"   - Throughput          : {metrics.get('throughput', 0):.2f} rows/s")
+    print(f"   - Idempotency Check   : {metrics.get('idempotency_check', 'PASS')}")
+    print("=" * 60)
+
+    return metrics
 
 
 def main():
-    while True:
-        print("\n" + "=" * 65)
-        print("🎓 Big Data Pipeline Project (Al-Razi University) - Main System")
-        print("=" * 65)
-        print(" [1] Generate Small Sample & Run Ingestion Pipeline")
-        print(" [2] Run Ingestion Pipeline on Huge File")
-        print(" [3] Run Practical Queries, Indexes & Explain Benchmark")
-        print(" [4] Run Aggregation Reports (5 Reports)")
-        print(" [5] Build & Incremental Refresh Materialized Views")
-        print(" [6] Execute Scheduled Jobs & View Execution Audit Logs")
-        print(" [7] Start Unified FastAPI Server")
-        print(" [0] Exit")
-        print("=" * 65)
+    parser = argparse.ArgumentParser(
+        description="Unified Big Data Pipeline Ingestion CLI (Non-Interactive)"
+    )
+    parser.add_argument(
+        "file",
+        nargs="?",
+        default=None,
+        help="Path to CSV dataset file (positional argument)",
+    )
+    parser.add_argument(
+        "--file",
+        "-f",
+        dest="file_flag",
+        default=None,
+        help="Path to CSV dataset file (flag argument)",
+    )
 
-        try:
-            choice = int(input(" Enter your choice [0-7]: "))
-        except ValueError:
-            print("❌ Please enter a valid number.")
-            continue
+    args = parser.parse_args()
+    target_file = args.file_flag or args.file
 
-        if choice == 0:
-            print("Goodbye!")
-            break
-
-        elif choice == 1:
-            generate_sample(HUGE_FILE_PATH, SMALL_SAMPLE_PATH, num_rows=SMALL_SAMPLE_GENERATION_SIZE_MB)
-            run_ingest(SMALL_SAMPLE_PATH)
-
-        elif choice == 2:
-            run_ingest(HUGE_FILE_PATH)
-
-        elif choice == 3:
-            from pymongo import MongoClient
-            client = MongoClient(MONGO_URI)
-            db = client[MONGO_DB_NAME]
-            try:
-                analytics_queries.run_explain_benchmarks(db)
-            finally:
-                client.close()
-
-        elif choice == 4:
-            from pymongo import MongoClient
-            client = MongoClient(MONGO_URI)
-            db = client[MONGO_DB_NAME]
-            try:
-                aggregations.run_all(db)
-            finally:
-                client.close()
-
-        elif choice == 5:
-            from pymongo import MongoClient
-            client = MongoClient(MONGO_URI)
-            db = client[MONGO_DB_NAME]
-            try:
-                res = materialized_views.refresh_all_views(db, mode="incremental")
-                print("✅ Materialized Views refresh result:")
-                print(json.dumps(res, indent=2, ensure_ascii=False))
-            finally:
-                client.close()
-
-        elif choice == 6:
-            from pymongo import MongoClient
-            client = MongoClient(MONGO_URI)
-            db = client[MONGO_DB_NAME]
-            try:
-                print("\n1. Executing Job 1 (refresh_materialized_views)...")
-                r1 = scheduler_jobs.execute_job("refresh_materialized_views", db=db, triggered_by="cli_manual")
-                print(f"Status: {r1['status']} | Duration: {r1['duration_seconds']}s")
-
-                print("\n2. Executing Job 2 (generate_periodic_report)...")
-                r2 = scheduler_jobs.execute_job("generate_periodic_report", db=db, triggered_by="cli_manual")
-                print(f"Status: {r2['status']} | Duration: {r2['duration_seconds']}s")
-
-                print("\n3. Latest execution audit logs in database:")
-                logs = scheduler_jobs.get_job_history(db, limit=5)
-                for l in logs:
-                    print(f"   [{l['status']}] {l['job_name']} at {l['start_time']} (duration: {l['duration_seconds']}s)")
-            finally:
-                client.close()
-
-        elif choice == 7:
-            import uvicorn
-            print("\n🚀 Starting FastAPI server...")
-            print("🌐 Direct URL: http://127.0.0.1:8000")
-            print("📚 Interactive Swagger Docs: http://127.0.0.1:8000/docs")
-            uvicorn.run("src.api:app", host="127.0.0.1", port=8000, reload=False)
-            break
+    try:
+        run_ingest(target_file)
+        sys.exit(0)
+    except Exception as e:
+        print(f"❌ Pipeline Execution Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
