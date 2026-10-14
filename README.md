@@ -155,6 +155,18 @@ copy .env.example .env
      🌐 **http://127.0.0.1:8000/dashboard**
   4. يعرض روابط توثيق Swagger وفحص الصحة مباشرة في شاشة الأوامر.
 
+### ⚡ تشغيل التقييم الآلي المباشر (Non-Interactive Ingest)
+لتشغيل معالجة ملف محدد غير تفاعلياً بدون انتظار إدخال يدوي:
+```bash
+python main.py data/01_student_test_small.csv
+```
+أو الاستدعاء البرمجي المباشر:
+```python
+from main import run_ingest
+metrics = run_ingest("data/01_student_test_small.csv")
+```
+
+
 ---
 
 <a id="ar-3-2"></a>
